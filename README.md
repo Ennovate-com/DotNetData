@@ -3,7 +3,7 @@
 
 Returns rows of data from database as PowerShell objects, rather than just one line of text data per row.
 This allows writing PowerShell code to perform operations involving different database instances or even different DBMS instances.
-For example, data can be merged from different DBMS or syncronized from one database instance into another DBMS instance.
+For example, data can be merged from different DBMS or synchronized from one database instance into another DBMS instance.
 The original use case that prompted creating this code was synchronizing data in many edge MySQL instances with a centralized SQL Server instance.
 
 Database Management Systems (DBMS) currently supported:
