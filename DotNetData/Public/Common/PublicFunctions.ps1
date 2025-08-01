@@ -1,12 +1,18 @@
-<# DataFunctions.ps1
+<# DotNetData/Public/Common/PublicFunctions.ps1
 #>
 
 function Write-ErrorRecord {
-   [CmdletBinding(PositionalBinding = $false)]
+   [CmdletBinding(PositionalBinding = $false, DefaultParameterSetName='AsWarning')]
    [OutputType([Data.DataRowCollection])]
    Param(
-      [Parameter(Position = 0, Mandatory = $true, ValueFromPipeline = $true)]
-      [Management.Automation.ErrorRecord] $ErrorRecord
+      [Parameter(ParameterSetName = 'AsWarning', Mandatory = $false, ValueFromPipeline = $false)]
+      [Switch] $AsWarning,
+#      [Parameter(ParameterSetName = 'AsOther', Mandatory = $true, ValueFromPipeline = $false)]
+#      [Switch] $AsOther,
+      [Parameter(Position = 0, Mandatory = $true, ValueFromPipeline = $false)]
+      [Management.Automation.ErrorRecord] $ErrorRecord,
+      [Parameter(Position = 1, Mandatory = $false, ValueFromPipeline = $false)]
+      [String] $Message
    )
 
 <#
@@ -53,8 +59,16 @@ function Write-ErrorRecord {
 
 #>
 
-   Write-Warning -Message ($ErrorRecord.ToString(), $ErrorRecord.InvocationInfo.PositionMessage -join [Environment]::NewLine)
-   Write-Error -ErrorRecord $ErrorRecord -CategoryActivity $ErrorRecord.CategoryInfo.Activity -CategoryReason $ErrorRecord.CategoryInfo.Reason -CategoryTargetName $ErrorRecord.CategoryInfo.TargetName -CategoryTargetType $ErrorRecord.CategoryInfo.TargetType
+   [Management.Automation.CallStackFrame] $csf = (gcs)[0]
+   if ($PSCmdlet.ParameterSetName -eq 'AsWarning') {
+      Write-Warning -Message ($ErrorRecord.ToString(), $ErrorRecord.InvocationInfo.PositionMessage -join [Environment]::NewLine)
+   }
+   else {
+   # Warning Message with location in this module
+      [String[]] $msgs = , '$($MyInvocation.MyCommand.Name): Parameter set not recognized in DotNetData module, PublicFunctions.ps1, Write-ErrorRecord'
+      [String] $functionAndScriptLocation = "in $($csf.FunctionName) at $($csf.ScriptName): $($csf.ScriptLineNumber)"
+      Write-Warning -Message (@( $msgs; $functionAndScriptLocation ) -join "$([Environment]::NewLine)         ")
+   }
 
 }
 
@@ -77,7 +91,7 @@ function Set-DotNetDataConfiguration {
 
       [Collections.Generic.Dictionary[[String], [Type]]] $paramNameTypeDict = New-Object -TypeName 'Collections.Generic.Dictionary[[String], [Type]]'
 
-      switch -Exact ($DBMS) {
+      [Management.Automation.CallStackFrame] $csf = (gcs)[0]; switch -Exact ($DBMS) {
 
          'MySQL' {
             $paramNameTypeDict['DllPath'] = [String]
@@ -88,7 +102,11 @@ function Set-DotNetDataConfiguration {
          }
 
          default {
-            Write-Error -Message "$($MyInvocation.MyCommand.Name): Unrecognized DBMS '${DBMS}'" -CategoryReason 'Coding error in module!' -CategoryTargetName $MyInvocation.MyCommand.Name -CategoryTargetType 'ModuleFile'
+         # Error Message with location in this module
+            [String[]] $msgs = , "$($MyInvocation.MyCommand.Name): Unrecognized DBMS '${DBMS}'"
+            [String] $functionAndScriptLocation = "in $($csf.FunctionName) at $($csf.ScriptName): $($csf.ScriptLineNumber)"
+            [String] $activity = "switch ('${DBMS}')"
+            Write-Error -Message (@( $msgs; $functionAndScriptLocation ) -join "$([Environment]::NewLine)         ") -CategoryActivity $activity -CategoryReason 'Coding error in module!' -CategoryTargetName $MyInvocation.MyCommand.Name -CategoryTargetType 'Module'
          }
 
       } # switch -Exact ($DBMS)
@@ -117,7 +135,7 @@ function Set-DotNetDataConfiguration {
 
       [Boolean] $hasDllPath = $false
 
-      switch -Exact ($DBMS) {
+      [Management.Automation.CallStackFrame] $csf = (gcs)[0]; switch -Exact ($DBMS) {
 
          'MySQL' {
             $hasDllPath = $true
@@ -128,7 +146,11 @@ function Set-DotNetDataConfiguration {
          }
 
          default {
-            Write-Error -Message "$($MyInvocation.MyCommand.Name): Unrecognized DBMS '${DBMS}'" -CategoryReason 'Coding error in module!' -CategoryTargetName $MyInvocation.MyCommand.Name -CategoryTargetType 'ModuleFile'
+         # Error Message with location in this module
+            [String[]] $msgs = , "$($MyInvocation.MyCommand.Name): Unrecognized DBMS '${DBMS}'"
+            [String] $functionAndScriptLocation = "in $($csf.FunctionName) at $($csf.ScriptName): $($csf.ScriptLineNumber)"
+            [String] $activity = "switch ('${DBMS}')"
+            Write-Error -Message (@( $msgs; $functionAndScriptLocation ) -join "$([Environment]::NewLine)         ") -CategoryActivity $activity -CategoryReason 'Coding error in module!' -CategoryTargetName $MyInvocation.MyCommand.Name -CategoryTargetType 'Module'
          }
 
       } # switch -Exact ($DBMS)
@@ -136,7 +158,12 @@ function Set-DotNetDataConfiguration {
       if ($hasDllPath) {
          [String] $DllPath = $PSBoundParameters['DllPath']
          if ( -not ( Test-Path -LiteralPath $DllPath ) ) {
-            Write-Error -Message "$($MyInvocation.MyCommand.Name): DllPath '${DllPath}' not found." -CategoryReason 'DLL not found' -CategoryTargetName $DllPath -CategoryTargetType 'File'
+         # Error Message with location of calling statement
+            [String[]] $msgs = , "$($MyInvocation.MyCommand.Name): File '${DllPath}' not found."
+            [Management.Automation.CallStackFrame] $csf = (gcs)[1]
+            [String] $functionAndScriptLocation = "in $($csf.FunctionName) at $($csf.ScriptName): $($csf.ScriptLineNumber)"
+            [String] $activity = 'Set-DotNetDataConfiguration'
+            Write-Error -Message (@( $msgs; $functionAndScriptLocation ) -join "$([Environment]::NewLine)         ") -CategoryActivity $activity -CategoryReason 'File not found' -CategoryTargetName $DllPath -CategoryTargetType 'File Path'
             $ok = $false
          }
          [Object] $obj = New-Object -TypeName 'PSObject' -Property @{
@@ -153,6 +180,132 @@ function Set-DotNetDataConfiguration {
    End {
    }
 
+}
+
+<#
+.EXAMPLE
+   [DateTime] $startTime = Get-Date
+   # ...
+   [TimeSpan] $ts = New-TimeSpan -Start $startTime
+   [String] $duration = Convert-TimeSpanToString $ts
+#>
+
+function Convert-TimeSpanToString {
+   [CmdletBinding(PositionalBinding = $false)]
+   [OutputType([String[]])]
+   Param (
+      [parameter(Position = 0, Mandatory = $true, ValueFromPipeline = $true)]
+      [TimeSpan[]] $TimeSpan
+   )
+
+   Begin {
+   }
+
+   Process {
+
+      $TimeSpan | % {
+
+         try { # else errors in this script block are reported at the ForEach-Object level
+
+         [TimeSpan] $ts = $_
+
+         [int] $roundedMinutes = [Math]::Round($ts.TotalMinutes, 0, [System.MidpointRounding]::AwayFromZero)
+         if ($roundedMinutes -ge 1440) {
+            [int] $durationDays = [Math]::Floor($roundedMinutes / 1440.0)
+            [int] $durationHours = [Math]::Floor($roundedMinutes / 60.0) - $durationDays * 24
+            [int] $durationMinutes = $roundedMinutes - $durationDays * 1440 + $durationHours * 60
+            if ($durationDays -eq 1) {
+               $pluralDays = ''
+            }
+            else {
+               $pluralDays = 's'
+            }
+            if ($durationHours -eq 1) {
+               $pluralHours = ''
+            }
+            else {
+               $pluralHours = 's'
+            }
+            if ($durationMinutes -eq 1) {
+               $pluralMinutes = ''
+            }
+            else {
+               $pluralMinutes = 's'
+            }
+            $duration = "${durationDays} day${pluralDays} ${durationHours} hour${pluralHours} ${durationMinutes} minute${pluralMinutes}"
+         }
+         elseif ($roundedMinutes -ge 60) {
+            [int] $durationHours = [Math]::Floor($durationMinutes / 60)
+            [int] $durationMinutes = $roundedMinutes - $durationHours * 60
+            if ($durationHours -eq 1) {
+               $pluralHours = ''
+            }
+            else {
+               $pluralHours = 's'
+            }
+            if ($durationMinutes -eq 1) {
+               $pluralMinutes = ''
+            }
+            else {
+               $pluralMinutes = 's'
+            }
+            $duration = "${durationHours} hour${pluralHours} ${durationMinutes} minute${pluralMinutes}"
+         }
+         else {
+            [Double] $durationSeconds = [Math]::Round($ts.TotalSeconds, 1, [System.MidpointRounding]::AwayFromZero)
+            if ($durationSeconds -gt 60.0) {
+               [int] $durationMinutes = [Math]::Floor($durationSeconds / 60)
+               [Double] $durationSeconds = [Math]::Round($ts.TotalSeconds - $durationMinutes * 60.0, 1, [System.MidpointRounding]::AwayFromZero)
+               if ($durationMinutes -eq 1) {
+                  $pluralMinutes = ''
+               }
+               else {
+                  $pluralMinutes = 's'
+               }
+               if ($durationSeconds -eq 1.0) {
+                  $pluralSeconds = ''
+               }
+               else {
+                  $pluralSeconds = 's'
+               }
+               $duration = "${durationMinutes} minute${pluralMinutes} ${durationSeconds} second${pluralSeconds}"
+            }
+            else {
+               if ($durationSeconds -eq 1.0) {
+                  $pluralSeconds = ''
+               }
+               else {
+                  $pluralSeconds = 's'
+               }
+               $duration = "${durationSeconds} second${pluralSeconds}"
+            }
+         }
+
+         Write-Output -InputObject $duration
+
+         } # try
+         catch {
+            [Management.Automation.ErrorRecord] $er1 = $_
+            Write-ErrorRecord -ErrorRecord $er1
+         } # catch
+
+      }
+
+   }
+
+   End {
+   }
+
+}
+
+function ConvertTo-SqlQuotedName {
+   [CmdletBinding(PositionalBinding = $false)]
+   [OutputType([String])]
+   Param(
+      [Parameter(Position = 0, Mandatory = $false, ValueFromPipeline = $false)]
+      [String] $Name
+   ) # Param
+   return "[$($Name -replace ']', ']]')]"
 }
 
 function New-DataSet {
@@ -237,11 +390,10 @@ function New-DataAdapter {
    [OutputType([Data.Common.DbDataAdapter])]
    Param(
       [Parameter(Position = 0, Mandatory = $true, ValueFromPipeline = $true)]
-      [AllowNull()]
       [Data.Common.DbConnection[]] $Connection,
       [Parameter(Position = 1, Mandatory = $true, ValueFromPipeline = $false)]
       [String] $Query = [NullString]::Value,
-      [Parameter(Position = 3, Mandatory = $false, ValueFromPipeline = $false)]
+      [Parameter(Position = 2, Mandatory = $false, ValueFromPipeline = $false)]
       [int] $CommandTimeout = $Script:DefaultCommandTimeout,
       [Parameter(Mandatory = $false, ValueFromPipeline = $false)]
       [AllowNull()]
@@ -255,7 +407,7 @@ function New-DataAdapter {
       [String] $paramName = 'ParameterTypeDictionary'
 
       [Data.Common.DbConnection] $conn = $Connection[0]
-      switch -Exact ($conn.GetType()) {
+      [Management.Automation.CallStackFrame] $csf = (gcs)[0]; switch -Exact ($conn.GetType()) {
          'MySql.Data.MySqlClient.MySqlConnection' {
             [Type] $paramType = [Collections.Generic.Dictionary[[String], [MySql.Data.MySqlClient.MySqlDbType]]]
          }
@@ -266,7 +418,11 @@ function New-DataAdapter {
             [Type] $paramType = [Collections.Generic.Dictionary[[String], [Data.SqlDbType]]]
          }
          default {
-            Write-Error -Message "$($MyInvocation.MyCommand.Name): Unrecognized Connection type '$($conn.GetType())'" -CategoryReason 'Coding error in module!' -CategoryTargetName $MyInvocation.MyCommand.Name -CategoryTargetType 'ModuleFile'
+         # Error Message with location in this module
+            [String[]] $msgs = , "$($MyInvocation.MyCommand.Name): Unrecognized Connection type '$($conn.GetType())'"
+            [String] $functionAndScriptLocation = "in $($csf.FunctionName) at $($csf.ScriptName): $($csf.ScriptLineNumber)"
+            [String] $activity = "switch ('${SystemOrUser}')"
+            Write-Error -Message (@( $msgs; $functionAndScriptLocation ) -join "$([Environment]::NewLine)         ") -CategoryActivity $activity -CategoryReason 'Coding error in module!' -CategoryTargetName $MyInvocation.MyCommand.Name -CategoryTargetType 'Module'
             [Type] $paramType = $null
          }
       }
@@ -314,7 +470,7 @@ function New-DataAdapter {
             [Data.Common.DbConnection] $conn = $_
             $nConn += 1
 
-            switch -Exact ($conn.GetType()) {
+            [Management.Automation.CallStackFrame] $csf = (gcs)[0]; switch -Exact ($conn.GetType()) {
                'MySql.Data.MySqlClient.MySqlConnection' {
                   $cmdClass = 'MySql.Data.MySqlClient.MySqlCommand'
                   $daClass = 'MySql.Data.MySqlClient.MySqlDataAdapter'
@@ -328,7 +484,11 @@ function New-DataAdapter {
                   $daClass = 'Data.SqlClient.SqlDataAdapter'
                }
                default {
-                  Write-Error -Message "$($MyInvocation.MyCommand.Name): Connection Class '$($conn.GetType())' not recognized" -CategoryReason 'Coding error in module!' -CategoryTargetName $MyInvocation.MyCommand.Name -CategoryTargetType 'ModuleFile'
+               # Error Message with location in this module
+                  [String[]] $msgs = , "$($MyInvocation.MyCommand.Name): Connection Class '$($conn.GetType())' not recognized"
+                  [String] $functionAndScriptLocation = "in $($csf.FunctionName) at $($csf.ScriptName): $($csf.ScriptLineNumber)"
+                  [String] $activity = "switch ('${SystemOrUser}')"
+                  Write-Error -Message (@( $msgs; $functionAndScriptLocation ) -join "$([Environment]::NewLine)         ") -CategoryActivity $activity -CategoryReason 'Coding error in module!' -CategoryTargetName $MyInvocation.MyCommand.Name -CategoryTargetType 'Module'
                }
             }
 
@@ -351,17 +511,20 @@ function New-DataAdapter {
             $da = New-Object -TypeName $daClass
 
             $da.SelectCommand = $cmd
-            [Management.Automation.CallStackFrame] $csfTryCatch1 = (gcs)[0]; Try {
+            $Global:Error.Clear()
+            [Management.Automation.CallStackFrame] $csfTryCatchLine = (gcs)[0]; try {
                $da.UpdateBatchSize = 0 # unlimited
                   # requires .NET Framework 2.0 or later - https://docs.microsoft.com/en-us/dotnet/api/system.data.common.dbdataadapter.updatebatchsize?view=netframework-2.0
                   # but fails on .NET Framework v4.8.03761
-            } # Try
-            Catch {
+            } # try
+            catch {
+            # Warning for suppressed Error
                [Management.Automation.ErrorRecord] $er1 = $_
-               [String] $msg = "$($MyInvocation.MyCommand.Name): Assigning to DbDataAdapter.UpdateBatchSize failed on PowerShell Version $( ( Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full' ).Version )"
-               [String] $functionAndScriptLocation = "in $($csfTryCatch1.FunctionName) at $($csfTryCatch1.ScriptName): $($csfTryCatch1.ScriptLineNumber)"
-               Write-Warning -Message ( $msg, $functionAndScriptLocation -join [Environment]::NewLine)
-            } # Catch
+               [String[]] $msgs = , "$($MyInvocation.MyCommand.Name): Assigning to DbDataAdapter.UpdateBatchSize failed on PowerShell Version $( ( Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full' ).Version )"
+               [String] $functionAndScriptLocation = "in $($csfTryCatchLine.FunctionName) at $($csfTryCatchLine.ScriptName): $($csfTryCatchLine.ScriptLineNumber)"
+               Write-Warning -Message (@( $msgs; $functionAndScriptLocation; $Global:Error ) -join "$([Environment]::NewLine)         ")
+               Write-Error -ErrorRecord $er1 -CategoryActivity $er1.CategoryInfo.Activity -CategoryReason $er1.CategoryInfo.Reason -CategoryTargetName $er1.CategoryInfo.TargetName -CategoryTargetType $er1.CategoryInfo.TargetType
+            } # catch
 
             Write-Output -InputObject $da
 
@@ -417,7 +580,12 @@ function Get-Rows {
       if ($DataAdapter -ne $NULL) {
 
          if (1, $DataAdapter.Count -notcontains $DataSet.Count) {
-            Write-Error -Message "$($MyInvocation.MyCommand.Name): Number of DataSet elements ($($DataSet.Count)) must be 1 or match the number of DataAdapter elements ($($DataAdapter.Count))" -CategoryReason 'Invalid parameter' -CategoryTargetName 'DataSet' -CategoryTargetType 'Parameter'
+         # Error Message with location of calling statement
+            [String[]] $msgs = , "$($MyInvocation.MyCommand.Name): Number of DataSet elements ($($DataSet.Count)) must be 1 or match the number of DataAdapter elements ($($DataAdapter.Count))"
+            [Management.Automation.CallStackFrame] $csf = (gcs)[1]
+            [String] $functionAndScriptLocation = "in $($csf.FunctionName) at $($csf.ScriptName): $($csf.ScriptLineNumber)"
+            [String] $activity = 'Get-Rows using DataAdapter(s)'
+            Write-Error -Message (@( $msgs; $functionAndScriptLocation ) -join "$([Environment]::NewLine)         ") -CategoryActivity $activity -CategoryReason 'Invalid parameter' -CategoryTargetName 'DataSet' -CategoryTargetType 'Parameter'
          }
 
          if ($DataSet.Count -eq 1) {
@@ -439,42 +607,58 @@ function Get-Rows {
 
             if ($DataSet.Count -eq 1) {
                $ds = $DataSet[0]
-               $msgDataSet = "DataSet"
+               $msgDataSet = 'DataSet'
             }
             else {
                $ds = $DataSet[$i]
-               $ds.Clear()
                $msgDataSet = "DataSet[${i}]"
             }
-            if ($ds -eq $null) {
-               Write-Error -Message "$($MyInvocation.MyCommand.Name): ${msgDataSet} is null" -CategoryReason 'DataSet is null' -CategoryTargetName $msgDataSet -CategoryTargetType 'DataSet'
+            [Management.Automation.CallStackFrame] $csf = (gcs)[0]; if ($ds -eq $null) {
+            # Error Message with location in this module (or calling function? should not occur?)
+               [String[]] $msgs = , "$($MyInvocation.MyCommand.Name): ${msgDataSet} is null"
+               [String] $functionAndScriptLocation = "in $($csf.FunctionName) at $($csf.ScriptName): $($csf.ScriptLineNumber)"
+               [String] $activity = "switch ('${SystemOrUser}')"
+               Write-Error -Message (@( $msgs; $functionAndScriptLocation ) -join "$([Environment]::NewLine)         ") -CategoryActivity $activity -CategoryReason 'DataSet is null' -CategoryTargetName $msgDataSet -CategoryTargetType 'DataSet'
                [Boolean] $ok = $false
             }
             else {
 
+               $ds.Clear()
+
                [Data.Common.DbCommand] $cmd = $da.SelectCommand
                if ($cmd -eq $NULL) {
-                  $msg = "$($MyInvocation.MyCommand.Name): Command has not been set in DataAdapter"
-                  Write-Error -Message $msg -CategoryReason 'Command not set' -CategoryTargetName 'SelectCommand' -CategoryTargetType 'Command'
+               # Error Message with location of calling statement
+                  [String[]] $msgs = , "$($MyInvocation.MyCommand.Name): Command has not been set in DataAdapter"
+                  [Management.Automation.CallStackFrame] $csf = (gcs)[1]
+                  [String] $functionAndScriptLocation = "in $($csf.FunctionName) at $($csf.ScriptName): $($csf.ScriptLineNumber)"
+                  [String] $activity = 'Get-Rows using DataAdapter(s)'
+                  Write-Error -Message (@( $msgs; $functionAndScriptLocation ) -join "$([Environment]::NewLine)         ") -CategoryActivity $activity -CategoryReason 'Command not set' -CategoryTargetName 'SelectCommand' -CategoryTargetType 'DataAdapter.Command'
                }
 
                if ($cmd.Connection.State -ne 'Open') {
-                  Write-Error -Message "$($MyInvocation.MyCommand.Name): Connection to instance `"$($cmd.Connection.DataSource)`" is not 'Open'" -CategoryReason 'Connection not Open' -CategoryTargetName $cmd.Connection.DataSource -CategoryTargetType 'DataSource'
+               # Error Message with location of calling statement
+                  [String[]] $msgs = , "$($MyInvocation.MyCommand.Name): Connection to instance `"$($cmd.Connection.DataSource)`" is not 'Open'"
+                  [Management.Automation.CallStackFrame] $csf = (gcs)[1]
+                  [String] $functionAndScriptLocation = "in $($csf.FunctionName) at $($csf.ScriptName): $($csf.ScriptLineNumber)"
+                  [String] $activity = 'Get-Rows using DataAdapter(s)'
+                  Write-Error -Message (@( $msgs; $functionAndScriptLocation ) -join "$([Environment]::NewLine)         ") -CategoryActivity $activity -CategoryReason 'Connection not Open' -CategoryTargetName $cmd.Connection.DataSource -CategoryTargetType 'DataSource'
                   if ($DataAdapter.Count -eq 1) {
                      [Boolean] $ok = $false
                   }
 # TO DO:          # else return data from other instances
                }
                else {
-                  [Management.Automation.CallStackFrame] $csfTryCatch1 = (gcs)[0]; Try {
+                  try {
                      [int] $nRows = $da.Fill($ds)
                         # nRows - number of rows in first DataTable
-                  } # Try
-                  Catch {
+                  } # try
+                  catch {
+                  # ErrorRecord
                      [Management.Automation.ErrorRecord] $er1 = $_
-                     Write-Error -ErrorRecord $er1 -CategoryReason 'DataAdapter.Fill threw exception' -CategoryTargetName $cmd.Connection.DataSource -CategoryTargetType 'DataSource'
+                     [String] $activity = 'DataAdapter.Fill'
+                     Write-Error -ErrorRecord $er1 -CategoryActivity $activity -CategoryReason 'DataAdapter.Fill threw exception' -CategoryTargetName $cmd.Connection.DataSource -CategoryTargetType 'DataSource'
                      [Boolean] $ok = $false
-                  } # Catch
+                  } # catch
                }
 
             }

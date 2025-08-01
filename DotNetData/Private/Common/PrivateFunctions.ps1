@@ -1,7 +1,9 @@
-<#
+<# DotNetData/Private/Common/PrivateFunctions.ps1
+
    System Configuration File Location: C:\ProgramData\DotNetData\
    User Configuration File Location:   $($env:USERPROFILE)\AppData\Local\DotNetData\
    Configuration File Name:            DotNetData_config.json
+
 #>
 
 [String] $Script:ConfigDirName = 'DotNetData'
@@ -25,7 +27,7 @@ function Write-DotNetDataConfiguration {
    [String] $userConfigDirPath = Join-Path -Path $userAppDataDirPath -ChildPath 'DotNetData'
    [String] $userConfigFilePath = Join-Path -Path $userConfigDirPath -ChildPath $Script:ConfigFileName
 
-   switch -Exact ($SystemOrUser) {
+   [Management.Automation.CallStackFrame] $csf = (gcs)[0]; switch -Exact ($SystemOrUser) {
       'System' {
          [String] $appdataDirPath = [Environment]::GetFolderPath('CommonApplicationData')
          [String] $configDirPath = Join-Path -Path $appdataDirPath -ChildPath 'DotNetData'
@@ -38,7 +40,11 @@ function Write-DotNetDataConfiguration {
          [Boolean] $checkForUserConfig = $false
       }
       default {
-         Write-Error -Message "$($MyInvocation.MyCommand.Name): Unrecognized SystemOrUser '${SystemOrUser}'" -CategoryReason 'Coding error in module!' -CategoryTargetName $MyInvocation.MyCommand.Name -CategoryTargetType 'ModuleFile'
+      # Error Message with location in this module
+         [String[]] $msgs = , "$($MyInvocation.MyCommand.Name): Unrecognized SystemOrUser '${SystemOrUser}'"
+         [String] $functionAndScriptLocation = "in $($csf.FunctionName) at $($csf.ScriptName): $($csf.ScriptLineNumber)"
+         [String] $activity = "switch ('${SystemOrUser}')"
+         Write-Error -Message (@( $msgs; $functionAndScriptLocation ) -join "$([Environment]::NewLine)         ") -CategoryActivity $activity -CategoryReason 'Coding error in module!' -CategoryTargetName $MyInvocation.MyCommand.Name -CategoryTargetType 'Module'
       }
    }
 
@@ -132,7 +138,12 @@ function Get-DotNetDataConfiguration {
    }
 
    if ($missingConfig) {
-      Write-Error -Message "Configuration for ${DBMS} not found. Use 'Set-DotNetDataConfiguration' to create it." -CategoryReason 'Missing configuration' -CategoryTargetName $Script:ConfigFileName -CategoryTargetType 'File'
+   # Error Message with location of calling statement
+      [String[]] $msgs = , "$($MyInvocation.MyCommand.Name): Configuration for ${DBMS} not found. Use 'Set-DotNetDataConfiguration' to create it."
+      [Management.Automation.CallStackFrame] $csf = (gcs)[1]
+      [String] $functionAndScriptLocation = "in $($csf.FunctionName) at $($csf.ScriptName): $($csf.ScriptLineNumber)"
+      [String] $activity = 'Get-DotNetDataConfiguration'
+      Write-Error -Message (@( $msgs; $functionAndScriptLocation ) -join "$([Environment]::NewLine)         ") -CategoryActivity $activity -CategoryReason 'Missing configuration' -CategoryTargetName $Script:ConfigFileName -CategoryTargetType 'Configuration File'
    }
 
 }
@@ -151,7 +162,12 @@ function Import-Dll {
 # Load DLL
 
    if ( -not ( Test-Path -LiteralPath $dllPath ) ) {
-      Write-Error -Message "$($MyInvocation.MyCommand.Name): ${dllFileName} not found at '${DllPath}' - specify correct path in DllPath parameter or add it to paths being searched" -CategoryReason 'Invalid DllPath' -CategoryTargetName 'DllPath' -CategoryTargetType 'Parameter'
+   # Error Message with location of calling statement
+      [String[]] $msgs = , "$($MyInvocation.MyCommand.Name): ${dllFileName} not found at '${DllPath}' - specify correct path in DllPath parameter or add it to paths being searched"
+      [Management.Automation.CallStackFrame] $csf = (gcs)[1]
+      [String] $functionAndScriptLocation = "in $($csf.FunctionName) at $($csf.ScriptName): $($csf.ScriptLineNumber)"
+      [String] $activity = 'Set-DotNetDataConfiguration'
+      Write-Error -Message (@( $msgs; $functionAndScriptLocation ) -join "$([Environment]::NewLine)         ") -CategoryActivity $activity -CategoryReason 'File not found' -CategoryTargetName $DllPath -CategoryTargetType 'File Path'
    }
 
 # Load the DLL
@@ -160,19 +176,26 @@ function Import-Dll {
       Write-Verbose -Message "$($MyInvocation.MyCommand.Name): ${assemblyName} assembly already loaded"
    } # if (already loaded)
    else { # needs loaded
+      $Global:Error.Clear()
       [Management.Automation.CallStackFrame] $csfTryCatchLine = (gcs)[0]; try {
          [Management.Automation.CallStackFrame] $csfTryCatchLine = (gcs)[0]; if (Test-Path -LiteralPath $DllPath) {
             [Management.Automation.CallStackFrame] $csfTryCatchLine = (gcs)[0]; [void] [Reflection.Assembly]::LoadFrom($DllPath)
             # or [System.Reflection.Assembly]::LoadWithPartialName($assemblyName)
          }
          else {
-            Write-Error -Message "$($MyInvocation.MyCommand.Name): ${dllFileName} not found at '${DllPath}' - specify correct path in DllPath parameter or add it to paths being searched" -CategoryReason 'Invalid DllPath' -CategoryTargetName 'DllPath' -CategoryTargetType 'Parameter'
+         # Error Message with location of calling statement
+            [String[]] $msgs = , "$($MyInvocation.MyCommand.Name): ${dllFileName} not found at '${DllPath}' - specify correct path in DllPath parameter or add it to paths being searched"
+            [Management.Automation.CallStackFrame] $csf = (gcs)[1]
+            [String] $functionAndScriptLocation = "in $($csf.FunctionName) at $($csf.ScriptName): $($csf.ScriptLineNumber)"
+            [String] $activity = "Loading DLL from '${DllPath}'"
+            Write-Error -Message (@( $msgs; $functionAndScriptLocation ) -join "$([Environment]::NewLine)         ") -CategoryActivity $activity -CategoryReason 'File not found' -CategoryTargetName 'DllPath' -CategoryTargetType 'Parameter'
          }
       }
       catch {
-         [Management.Automation.ErrorRecord] $ex = $_
-         $errstr = Write-Message -Message "[Reflection.Assembly]::LoadFrom('$DllPath')" -ErrorRecord $ex $Global:ErrorCount -CallStackFrame $csfTryCatchLine
-         Write-Error -Message "$($MyInvocation.MyCommand.Name): Failed to load ${dllFileName}. ${errstr}" -CategoryReason 'Invalid DllPath' -CategoryTargetName 'DllPath' -CategoryTargetType 'Parameter'
+      # ErrorRecord
+         [Management.Automation.ErrorRecord] $er1 = $_
+         [String] $activity = "Calling [Reflection.Assembly]::LoadFrom('${DllPath}')"
+         Write-Error -ErrorRecord $er1 -CategoryActivity $activity -CategoryReason "[Reflection.Assembly]::LoadFrom('${DllPath}') failed" -CategoryTargetName $DllPath -CategoryTargetType 'Parameter'
       }
    } # else (needs loaded)
 
@@ -208,8 +231,12 @@ function Get-CredentialForUserName {
    if ($exists) {
       [Security.SecureString] $password = Get-Content -LiteralPath $credPath -Encoding 'utf8' | ConvertTo-SecureString
       if ($password -eq $null) {
-         [String] $msg = "Null value retrieved from password file `"${credPath}`""
-         Write-Error -Message "$($MyInvocation.MyCommand.Name): ${msg}" -CategoryReason 'Null password' -CategoryTargetName '(null)' -CategoryTargetType 'Password'
+      # Error Message with location of calling statement
+         [String[]] $msgs = , "$($MyInvocation.MyCommand.Name): Null value retrieved from password file `"${credPath}`""
+         [Management.Automation.CallStackFrame] $csf = (gcs)[1]
+         [String] $functionAndScriptLocation = "in $($csf.FunctionName) at $($csf.ScriptName): $($csf.ScriptLineNumber)"
+         [String] $activity = 'Get-CredentialForUserName'
+         Write-Error -Message (@( $msgs; $functionAndScriptLocation ) -join "$([Environment]::NewLine)         ") -CategoryActivity $activity -CategoryReason 'Null password' -CategoryTargetName $credPath -CategoryTargetType 'Password File'
       }
       else {
          [Management.Automation.PSCredential] $cred = New-Object -TypeName 'Management.Automation.PSCredential' ($username, $password)
@@ -217,8 +244,12 @@ function Get-CredentialForUserName {
       }
    }
    else {
-      [String] $msg = "Missing password file `"${credPath}`""
-      Write-Error -Message "$($MyInvocation.MyCommand.Name): ${msg}" -CategoryReason 'Missing password file' -CategoryTargetName $credPath -CategoryTargetType 'File'
+   # Error Message with location of calling statement
+      [String[]] $msgs = , "$($MyInvocation.MyCommand.Name): Missing password file `"${credPath}`""
+      [Management.Automation.CallStackFrame] $csf = (gcs)[1]
+      [String] $functionAndScriptLocation = "in $($csf.FunctionName) at $($csf.ScriptName): $($csf.ScriptLineNumber)"
+      [String] $activity = 'Get-CredentialForUserName'
+      Write-Error -Message (@( $msgs; $functionAndScriptLocation ) -join "$([Environment]::NewLine)         ") -CategoryActivity $activity -CategoryReason 'Missing password file' -CategoryTargetName $credPath -CategoryTargetType 'Password File'
    }
 
 }
