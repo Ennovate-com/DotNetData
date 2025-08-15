@@ -11,9 +11,23 @@ Database Management Systems (DBMS) currently supported:
 + MySQL from Oracle
 + PostgreSQL
 
+CODE HERE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 ### Usage
 1. Download the `DotNetData.zip` archive file.
 1. Extract the archive under one of directories in `$env:PSModulePath`, such as `C:\Program Files\WindowsPowerShell\Modules`.
+
+#### Connecting from an untrusted domain
+
+When connecting to a database instance in one domain from another domain, where there is no trust relationship between those domains, `runs /netonly` can be used to provide authorization.
+
+Using Integrated Security, if there is no trust relationship between the client domain and the server domain, an exception is thrown:
+
+```New-SqlServerConnection : Exception calling "Open" with "0" argument(s): "Login failed. The login is from an untrusted domain and cannot be used with Integrated authentication."```
+
+Running PowerShell with `runas /netonly` allows specifying the credentials for the target domain:
+
+```runas /netonly /user:DOMAIN\username PowerShell_ise```
 
 ### Examples
 See the files in the Examples directory for examples for each DBMS.
