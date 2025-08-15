@@ -25,7 +25,7 @@ See the files in the Examples directory for examples for each DBMS.
 
 ### Potential Issues
 + `Error: The field or property: “Datetime” for type: “MySql.Data.MySqlClient.MySqlDbType” differs only in letter casing from the field or property: “DateTime”. The type must be Common Language Specification (CLS) compliant.`\
-This is a result of a conflict between case-sensitive DateTime and Datetime in the libraries for various DBMS engines and the case-insensitivity requirement of the CLS runtime. The error occurs on any DB type, not just `DateTime`, such as:
+This is a result of the existence of both DateTime and Datetime in case-insensitive DBMS libraries which violates the requirement (CA1708) in the case-sensitivite CLS runtime and its support of case-insensitive languages, where unique identifiers are required to be different by more than just their letter case. The error occurs when the class (`MySql.Data.MySqlCient.MySqlDbType`) is referenced and therefore occurs for any DB type, not just `DateTime`, such as:
 ```powershell
 [MySql.Data.MySqlCient.MySqlDbType]::VarChar
 ```
