@@ -11,8 +11,15 @@ Set-StrictMode -Version 'Latest' # Current and child scopes
 
 # Get arrays of private and public source FileSpace
 
-[IO.FileInfo[]] $pvtFileInfo = Get-ChildItem -Path (Join-Path $PSScriptRoot Private) -Include *.ps1 -File -Recurse
-[IO.FileInfo[]] $pubFileInfo = Get-ChildItem -Path (Join-Path $PSScriptRoot Public) -Include *.ps1 -File -Recurse 
+if ($PSVersionTable.PSVersion.Major -lt 3) {
+   # -File and -Directory parameters added in PSv3
+   [IO.FileInfo[]] $pvtFileInfo = Get-ChildItem -Path (Join-Path $PSScriptRoot Private) -Include *.ps1 -Recurse
+   [IO.FileInfo[]] $pubFileInfo = Get-ChildItem -Path (Join-Path $PSScriptRoot Public) -Include *.ps1 -Recurse
+}
+else {
+   [IO.FileInfo[]] $pvtFileInfo = Get-ChildItem -Path (Join-Path $PSScriptRoot Private) -Include *.ps1 -File -Recurse
+   [IO.FileInfo[]] $pubFileInfo = Get-ChildItem -Path (Join-Path $PSScriptRoot Public) -Include *.ps1 -File -Recurse
+}
 
 # Source in the source files
 
