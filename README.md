@@ -38,6 +38,7 @@ See the files in the Examples directory for examples for each DBMS.
    - Execute the test script in PowerShell
 
 ### Potential Issues
+
 + `Error: The field or property: “Datetime” for type: “MySql.Data.MySqlClient.MySqlDbType” differs only in letter casing from the field or property: “DateTime”. The type must be Common Language Specification (CLS) compliant.`\
 This is a result of the existence of both DateTime and Datetime in case-insensitive DBMS libraries which violates the requirement (CA1708) in the case-sensitivite CLS runtime and its support of case-insensitive languages, where unique identifiers are required to be different by more than just their letter case. The error occurs when the class (`MySql.Data.MySqlCient.MySqlDbType`) is referenced and therefore occurs for any DB type, not just `DateTime`, such as:
 ```powershell
@@ -46,4 +47,14 @@ This is a result of the existence of both DateTime and Datetime in case-insensit
 As a workaround, use GetMember to get the constant value for the DB type, as in the following example for `VarChar`:
 ```powershell
 [MySql.Data.MySqlClient.MySqlDbType].GetMember('VarChar').GetRawConstantValue()
+```
+
++ `System.Management.Automation.MethodInvocationException Exception calling "Fill" with "1" argument(s): "Input string was not in a correct format."\
+System.Management.Automation.ParentContainsErrorRecordException Exception calling "Fill" with "1" argument(s): "Input string was not in a correct format."\
+System.FormatException Input string was not in a correct format.`\
+Check the data type and length of the Parameter(s) in the DataAdapter:\
+`Write-Verbose -Message "Type: $($da.SelectCommand.Parameters['@param1'].MySqlDbType) Size: $($da.SelectCommand.Parameters['@param1'].Size)"`\
+Be sure to include the length for any data type that is not a fixed size:
+```powershell
+[void] $da.SelectCommand.Parameters.Add('@param1', [MySql.Data.MySqlClient.MySqlDbType].GetMember('VarChar').GetRawConstantValue(), 255)
 ```
